@@ -110,9 +110,8 @@ function createResponseParser(socket, requestsStore) {
             delete req.response_body;
 
             req.headers = JSON.stringify(req.headers);
-            db.query('INSERT INTO requests (method, host, port, path, headers, ssl, request, response) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [req.method, req.host, req.port, req.path, req.headers, req.ssl, req.request, req.response]);
+            db.query('INSERT INTO requests (method, host, port, path, headers, ssl, request, response, request_body) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [req.method, req.host, req.port, req.path, req.headers, req.ssl, req.request, req.response, req.request_body.toString()]);
         }
-        // '_id', 'method', 'host', 'port', 'path', 'headers', 'ssl', 'request', 'request_body', 'request_time', 'response', 'response_time', 'time'
 
     };
 

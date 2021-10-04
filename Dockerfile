@@ -41,9 +41,6 @@ VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 # Back to the root user
 USER root
 
-# Объявлем порт сервера
-EXPOSE 8080
-
 ENV PGPASSWORD docker
 CMD service postgresql start &&  psql -h localhost -d docker -U docker -p 5432 -a -q -f ./start.sql
 

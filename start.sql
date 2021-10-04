@@ -11,4 +11,5 @@ CREATE TABLE requests(
     headers varchar,
     ssl bool,
     request varchar,
-    response varchar);
+    response varchar,
+    request_body varchar);

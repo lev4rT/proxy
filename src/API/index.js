@@ -6,7 +6,7 @@ const {db} = require('../Postgres/db');
 app.use(express.json());
 
 
-app.get ('/requests', async function getPlayerByID (req, res) {
+app.get ('/requests', async (req, res) => {
     try {
         const answer = await db.query('SELECT * from requests');
         res.json(answer.rows);
@@ -15,7 +15,7 @@ app.get ('/requests', async function getPlayerByID (req, res) {
     }
 });
 
-app.get ('/requests/:id', async function getPlayerByID (req, res) {
+app.get ('/requests/:id', async (req, res) => {
     try {
         const id = req.params.id;
         const answer = await db.query('SELECT * from requests WHERE id=$1', [parseInt(id)]);
@@ -26,11 +26,12 @@ app.get ('/requests/:id', async function getPlayerByID (req, res) {
 });
 
 
-app.get ('/repeat/:id', async function getPlayerByID (req, res) {
+app.get ('/repeat/:id', async (req, res) => {
     try {
         const id = req.params.id;
         const answer = await db.query('SELECT * from requests WHERE id=$1', [parseInt(id)]);
         const request = answer.rows[0];
+
         let url = request.ssl ? 'https://' : 'http://' + `${request.host}${request.path}`;
         axios({
             url: url,
@@ -46,7 +47,41 @@ app.get ('/repeat/:id', async function getPlayerByID (req, res) {
     }
 });
 
+// XSS VULNERABLE
+app.get ('/scand/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const answer = await db.query('SELECT * from requests WHERE id=$1', [parseInt(id)]);
+        const request = answer.rows[0];
+        let url = request.ssl ? 'https://' : 'http://' + `${request.host}${request.path}`;
+
+        const XSS = `vulnerable'"><img src onerror=alert()>`;
+        const vulnerable = [];
+        let params = request.request_body.split('&');
+        for (let pos = 0; pos < params.length; ++pos) {
+
+            params[pos] = params[pos].split('=');
+            params[pos][1] = XSS;
+            params[pos] = params[pos].join('=');
+            let xssParams = params.join('&');
+            axios({
+                url: url,
+                method: request.method,
+                headers: JSON.parse(request.headers),
+                data: xssParams,
+            }).then((resp) => {
+                if (resp.data.includes(XSS)) {
+                    vulnerable.push(params[pos]);
+                }
+            });
+        }
+        res.json({vulnerable_params: vulnerable});
+    } catch (e) {
+            res.json(e);
+        }
+});
+
 const port = 8081;
 app.listen(port, () => {
-    console.log(`CORS-enabled web server listening on port: ${port}`);
+    console.log(`API web server listening on port: ${port}`);
 })
