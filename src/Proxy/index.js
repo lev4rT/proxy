@@ -11,8 +11,9 @@ const url = require('url');
 const net = require('net');
 tls.DEFAULT_MAX_VERSION = 'TLSv1.3';
 
+const {db} = require('../Postgres/db');
+
 const {preamble, maxBodySize, certs, port} = require('./utils/utils');
-let requestCounter = 1;
 
 const kOnHeadersComplete = HTTPParser.kOnHeadersComplete | 0;
 const kOnBody = HTTPParser.kOnBody | 0;
@@ -30,6 +31,7 @@ function createSecureContext(key, cert) {
 
 function generateCertificate(servername, cb) {
     fs.writeFile(`./cfgs/${servername}.ext`, [...preamble, `DNS.1 = ${servername}`].join('\n'), (err) => {
+        console.log(err);
         let gen_cert = spawn('./gen_cert.sh', [servername]);
         gen_cert.on('close', (code) => {
             if (code) {
@@ -73,7 +75,6 @@ function createRequestParser(socket, requestsStore, host, port, ssl) {
         }
         const r = `${methods[method]} ${url} HTTP/${versionMajor}.${versionMinor}\r\n${h}\r\n`
         const req = {
-            _id: Number(requestCounter).toString(),
             method: methods[method],
             host: host,
             port: port,
@@ -83,7 +84,7 @@ function createRequestParser(socket, requestsStore, host, port, ssl) {
             request: r,
             request_body: Buffer.from('')
         };
-        requestCounter++;
+        console.log(req);
         requestsStore.push(req)
     };
 
@@ -108,10 +109,13 @@ function createResponseParser(socket, requestsStore) {
             req.time = req.response_time - req.request_time;
             delete req.response_body;
 
-            console.log(req);
-            // collection.insertOne(req)
+            req.headers = JSON.stringify(req.headers);
+            db.query('INSERT INTO requests (method, host, port, path, headers, ssl, request, response) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [req.method, req.host, req.port, req.path, req.headers, req.ssl, req.request, req.response]);
         }
+        // '_id', 'method', 'host', 'port', 'path', 'headers', 'ssl', 'request', 'request_body', 'request_time', 'response', 'response_time', 'time'
+
     };
+
 
     responseParser[kOnHeadersComplete] = function (versionMajor, versionMinor, headers, method, url, statusCode, statusMessage) {
         let h = '';

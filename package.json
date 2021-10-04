@@ -2,11 +2,20 @@
   "name": "vulnerability_scanner",
   "version": "1.0.0",
   "description": "",
-  "main": "src/index.js",
+  "main": "src/Proxy/index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node src/Proxy/index.js",
+    "api": "node src/API/index.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "node-fetch": "^3.0.0",
+    "pg": "^8.7.1"
+  },
+  "devDependencies": {
+    "axios": "^0.22.0"
+  }
 }
