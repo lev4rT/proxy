@@ -29,7 +29,7 @@ function createSecureContext(key, cert) {
 }
 
 function generateCertificate(servername, cb) {
-    fs.writeFile(`./cfgs/${servername}.ext`, [...preamble, `DNS.1 = ${servername}`].join('\n'), () => {
+    fs.writeFile(`./cfgs/${servername}.ext`, [...preamble, `DNS.1 = ${servername}`].join('\n'), (err) => {
         let gen_cert = spawn('./gen_cert.sh', [servername]);
         gen_cert.on('close', (code) => {
             if (code) {
@@ -95,7 +95,53 @@ function createRequestParser(socket, requestsStore, host, port, ssl) {
     return requestParser;
 }
 
-function httpConnection(req, _res) {
+function createResponseParser(socket, requestsStore) {
+    const responseParser = new HTTPParser()//HTTPParser.RESPONSE);
+    responseParser.initialize(HTTPParser.RESPONSE, new HTTPServerAsyncResource('HTTPINCOMINGMESSAGE', socket));
+
+
+    responseParser[kOnMessageComplete] = () => {
+        const req = requestsStore.shift();
+        if (req && req.response && req.response_body) {
+            req.response += req.response_body.slice(0, maxBodySize).toString();
+            req.response_time = new Date();
+            req.time = req.response_time - req.request_time;
+            delete req.response_body;
+
+            console.log(req);
+            // collection.insertOne(req)
+        }
+    };
+
+    responseParser[kOnHeadersComplete] = function (versionMajor, versionMinor, headers, method, url, statusCode, statusMessage) {
+        let h = '';
+        for (let i = 0; i < headers.length; i += 2) {
+            h += `${headers[i]}: ${headers[i + 1]}\r\n`;
+        }
+        const resp = `HTTP/${versionMajor}.${versionMinor} ${statusCode} ${statusMessage}\r\n${h}\r\n`;
+        for (let i = 0; i < requestsStore.length; ++i) {
+            if (!requestsStore[i].response) {
+                requestsStore[i].response = resp;
+                requestsStore[i].response_body = Buffer.from('');
+                break
+            }
+        }
+    };
+
+    responseParser[kOnBody] = function (b, start, len) {
+        for (let i = requestsStore.length - 1; i >= 0; --i) {
+            if (requestsStore[i].response_body) {
+                requestsStore[i].response_body = Buffer.concat([requestsStore[i].response_body, b.slice(start, start + len)]);
+                break
+            }
+        }
+
+    };
+
+    return responseParser
+}
+
+function httpConnection(req, res) {
     if (req.url.startsWith('http')) {
         try {
             const parsedUrl = url.parse(req.url);
